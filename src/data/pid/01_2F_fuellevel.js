@@ -1,21 +1,18 @@
-module.exports =
-{
-    mode:   "01",
-    pid:    "2F",
-    name:   "fuellevel",
-    description: "Fuel Level Input",
+module.exports = {
+  mode: '01',
+  pid: '2F',
+  name: 'fuellevel',
+  description: 'Fuel Level Input',
 
-    min:    0,
-    max:    100,
-    unit:   "%",
+  min: 0,
+  max: 100,
+  unit: '%',
 
-    bytes:  1,
-    convertToUseful: function( byteA )
-    {
-        return ( ( parseInt( byteA, 16 ) * 100 ) / 255 );
-    },
-    testResponse: function( emulator )
-    {
-        return 40;
-    }
+  bytes: 1,
+  convertToUseful: function(byteA) {
+    return (parseInt(byteA, 16) * 100) / 255;
+  },
+  testResponse: function(emulator) {
+    return 40;
+  },
 };

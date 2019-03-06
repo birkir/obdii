@@ -1,250 +1,201 @@
-/// <reference path="../typings/main.d.ts"/>
+import Debug from 'debug';
 
-let debug : debug.IDebug = require( "debug" )( "OBD2.Core.OBD" );
+const debug = Debug('OBD2.Core.OBD');
 
-export namespace OBD2
-{
-	export namespace Core
-	{
-		export class OBD
-		{
-			private _pidList 		: any;
-			private _dataReceived 	: string;
-			private _deviceCommands	: any = [
-				"?",
-				"OK",
-				"SEARCHING",
-				"SEARCHING...",
-				"UNABLE TO CONNECT",
-				"STOPPED",
-				"NO DATA",
-				"CAN ERROR",
-				"ERROR",
-				"BUS INIT",
-			];
-			// https://www.scantool.net/forum/index.php?topic=6927.0
+export interface IReplyParseCommand {
+  value: string;
+  name: string;
+  mode: string;
+  pid: string;
+  min: number;
+  max: number;
+  unit: string;
+}
 
-			constructor( pidList : any )
-			{
-				this._pidList		 = pidList;
-				this._dataReceived 	 = "";
+export class OBD {
+  private dataReceived: string = '';
+  private deviceCommands: string[] = [
+    '?',
+    'OK',
+    'SEARCHING',
+    'SEARCHING...',
+    'UNABLE TO CONNECT',
+    'STOPPED',
+    'NO DATA',
+    'CAN ERROR',
+    'ERROR',
+    'BUS INIT',
+  ];
+  // https://www.scantool.net/forum/index.php?topic=6927.0
 
-				debug( "Ready" );
-			}
+  constructor(private pidList: any) {
+    debug('Ready');
+  }
 
+  /**
+   * Parse Serial data stream to PID details
+   *
+   * @param data
+   * @param cb
+   */
+  public parseDataStream(data: any, cb: any) {
+    let currentString;
+    let arrayOfCommands;
 
-			/**
-			 * Parse Serial data stream to PID details
-			 *
-			 * @param data
-			 * @param cb
-			 */
-			public parseDataStream( data : any, cb : any )
-			{
-				let currentString, forString, arrayOfCommands;
+    // making sure it's a utf8 string
+    currentString = this.dataReceived + data.toString('utf8');
+    arrayOfCommands = currentString.split('>');
 
-				// making sure it's a utf8 string
-				currentString   = this._dataReceived + data.toString( "utf8" );
-				arrayOfCommands = currentString.split( ">" );
+    if (arrayOfCommands.length < 2) {
+      if (this.deviceCommands.indexOf(this.dataReceived.split('\r')[0]) > -1) {
+        cb('ecu', arrayOfCommands, this.dataReceived);
+        this.dataReceived = '';
+      }
+    } else {
+      for (const forString of arrayOfCommands) {
+        if (forString === '') {
+          continue;
+        }
 
-				if ( arrayOfCommands.length < 2 )
-				{
-					if ( this._deviceCommands.indexOf( this._dataReceived.split( "\r" )[ 0 ] ) > -1 )
-					{
-						cb( "ecu", arrayOfCommands, this._dataReceived );
-						this._dataReceived = "";
-					}
-				}
-				else
-				{
-					for ( let commandNumber = 0; commandNumber < arrayOfCommands.length; commandNumber++ )
-					{
-						forString = arrayOfCommands[ commandNumber ];
+        const multipleMessages = forString.split('\r');
+        for (const messageString of multipleMessages) {
+          if (messageString === '') {
+            continue;
+          }
 
-						if ( forString === "" )
-						{
-							continue;
-						}
+          const reply = this.parseCommand(messageString);
 
-						let multipleMessages = forString.split( "\r" );
-						for ( let messageNumber = 0; messageNumber < multipleMessages.length; messageNumber++ )
-						{
-							let messageString = multipleMessages[ messageNumber ];
+          if (this.deviceCommands.indexOf(messageString) > -1) {
+            cb('ecu', reply, messageString);
+          } else {
+            if (!reply.value || !reply.name || (!reply.mode && !reply.pid)) {
+              cb('bug', reply, messageString);
+            } else if (reply.mode === '41') {
+              cb('pid', reply, messageString);
+            } else if (reply.mode === '43') {
+              cb('dtc', reply, messageString);
+            }
+          }
+        }
+      }
+    }
+  }
 
-							if ( messageString === "" )
-							{
-								continue;
-							}
+  /**
+   * Parses a hexadecimal string to a reply object. Uses PIDS.
+   *
+   * @param {string} hexString Hexadecimal value in string that is received over the serialport.
+   * @return {Object} reply - The reply.
+   * @return {string} reply.value - The value that is already converted. This can be a PID converted answer or "OK" or "NO DATA".
+   * @return {string} reply.name - The name. --! Only if the reply is a PID.
+   * @return {string} reply.mode - The mode of the PID. --! Only if the reply is a PID.
+   * @return {string} reply.pid - The PID. --! Only if the reply is a PID.
+   */
+  public parseCommand(hexString: string) {
+    const valueArray = [];
+    const reply: IReplyParseCommand = {
+      value: undefined,
+      name: undefined,
+      mode: undefined,
+      pid: undefined,
+      min: undefined,
+      max: undefined,
+      unit: undefined,
+    };
 
-							let reply = this.parseCommand( messageString );
+    // No data or OK is the response.
+    if (hexString === 'NO DATA' || hexString === 'OK' || hexString === '?') {
+      reply.value = hexString;
+      return reply;
+    }
 
-							if ( this._deviceCommands.indexOf( messageString ) > -1 )
-							{
-								cb( "ecu", reply, messageString );
-							}
-							else
-							{
+    // Whitespace trimming
+    // Probably not needed anymore?
+    hexString = hexString.replace(/ /g, '');
 
-								if ( !reply.value || !reply.name || (!reply.mode && !reply.pid) )
-								{
-									cb( "bug", reply, messageString );
-								}
-								else if ( reply.mode === "41" )
-								{
-									cb( "pid", reply, messageString );
-								}
-								else if ( reply.mode === "43" )
-								{
-									cb( "dtc", reply, messageString );
-								}
+    for (let byteNumber = 0; byteNumber < hexString.length; byteNumber += 2) {
+      valueArray.push(hexString.substr(byteNumber, 2));
+    }
 
-							}
+    // PID mode
+    if (valueArray[0] === '41') {
+      reply.mode = valueArray[0];
+      reply.pid = valueArray[1];
 
-						}
+      for (const pidItem of this.pidList) {
+        if (pidItem.pid === reply.pid) {
+          const numberOfBytes = pidItem.bytes;
 
-					}
+          reply.name = pidItem.name;
+          reply.min = pidItem.min;
+          reply.max = pidItem.max;
+          reply.unit = pidItem.unit;
 
-				}
+          // Use static parameter (performance up, usually)
+          switch (numberOfBytes) {
+            case 1:
+              reply.value = pidItem.convertToUseful(valueArray[2]);
+              break;
 
-			}
+            case 2:
+              reply.value = pidItem.convertToUseful(
+                valueArray[2],
+                valueArray[3]
+              );
+              break;
 
-			/**
-			 * Parses a hexadecimal string to a reply object. Uses PIDS.
-			 *
-			 * @param {string} hexString Hexadecimal value in string that is received over the serialport.
-			 * @return {Object} reply - The reply.
-			 * @return {string} reply.value - The value that is already converted. This can be a PID converted answer or "OK" or "NO DATA".
-			 * @return {string} reply.name - The name. --! Only if the reply is a PID.
-			 * @return {string} reply.mode - The mode of the PID. --! Only if the reply is a PID.
-			 * @return {string} reply.pid - The PID. --! Only if the reply is a PID.
-			 */
-			public parseCommand( hexString : string )
-			{
-				let reply : obd2.OBD2_IReplyParseCommand = {
-						value : undefined,
-						name  : undefined,
-						mode  : undefined,
-						pid   : undefined,
-						min   : undefined,
-						max   : undefined,
-						unit  : undefined,
-					},
-					byteNumber,
-					valueArray; //New object
+            case 4:
+              reply.value = pidItem.convertToUseful(
+                valueArray[2],
+                valueArray[3],
+                valueArray[4],
+                valueArray[5]
+              );
+              break;
 
-				// No data or OK is the response.
-				if ( hexString === "NO DATA" || hexString === "OK" || hexString === "?" )
-				{
-					reply.value = hexString;
-					return reply;
-				}
+            case 8:
+              reply.value = pidItem.convertToUseful(
+                valueArray[2],
+                valueArray[3],
+                valueArray[4],
+                valueArray[5],
+                valueArray[6],
+                valueArray[7],
+                valueArray[8],
+                valueArray[9]
+              );
+              break;
 
-				hexString = hexString.replace( / /g, "" ); //Whitespace trimming //Probably not needed anymore?
-				valueArray = [];
+            // Special length, dynamic parameters
+            default:
+              reply.value = pidItem.convertToUseful.apply(
+                this,
+                valueArray.slice(2, 2 + parseInt(numberOfBytes, 10))
+              );
+              break;
+          }
 
-				for ( byteNumber = 0; byteNumber < hexString.length; byteNumber += 2 )
-				{
-					valueArray.push( hexString.substr( byteNumber, 2 ) );
-				}
+          // Value is converted, break out the for loop.
+          break;
+        }
+      }
+    } else if (valueArray[0] === '43') {
+      reply.mode = valueArray[0];
+      for (const pidItem of this.pidList) {
+        if (pidItem.mode === '03') {
+          reply.name = pidItem.name;
+          reply.value = pidItem.convertToUseful(
+            valueArray[1],
+            valueArray[2],
+            valueArray[3],
+            valueArray[4],
+            valueArray[5],
+            valueArray[6]
+          );
+        }
+      }
+    }
 
-				// PID mode
-				if ( valueArray[ 0 ] === "41" )
-				{
-					reply.mode = valueArray[ 0 ];
-					reply.pid  = valueArray[ 1 ];
-
-					for ( let i = 0; i < this._pidList.length; i++ )
-					{
-						if ( this._pidList[ i ].pid === reply.pid )
-						{
-							let numberOfBytes = this._pidList[ i ].bytes;
-
-							reply.name = this._pidList[ i ].name;
-							reply.min  = this._pidList[ i ].min;
-							reply.max  = this._pidList[ i ].max;
-							reply.unit = this._pidList[ i ].unit;
-
-							// Use static parameter (performance up, usually)
-							switch ( numberOfBytes )
-							{
-								case 1:
-									reply.value = this._pidList[ i ].convertToUseful(
-										valueArray[ 2 ]
-									);
-									break;
-
-								case 2:
-									reply.value = this._pidList[ i ].convertToUseful(
-										valueArray[ 2 ],
-										valueArray[ 3 ]
-									);
-									break;
-
-								case 4:
-									reply.value = this._pidList[ i ].convertToUseful(
-										valueArray[ 2 ],
-										valueArray[ 3 ],
-										valueArray[ 4 ],
-										valueArray[ 5 ]
-									);
-									break;
-
-								case 8:
-									reply.value = this._pidList[ i ].convertToUseful(
-										valueArray[ 2 ],
-										valueArray[ 3 ],
-										valueArray[ 4 ],
-										valueArray[ 5 ],
-										valueArray[ 6 ],
-										valueArray[ 7 ],
-										valueArray[ 8 ],
-										valueArray[ 9 ]
-									);
-									break;
-
-								// Special length, dynamic parameters
-								default:
-									reply.value = this._pidList[ i ].convertToUseful.apply(
-										this,
-										valueArray.slice( 2, 2 + parseInt( numberOfBytes, 10 ) )
-									);
-									break;
-							}
-
-							//Value is converted, break out the for loop.
-							break;
-						}
-					}
-
-				}
-
-				// DTC mode
-				else if ( valueArray[ 0 ] === "43" )
-				{
-					reply.mode = valueArray[ 0 ];
-					for ( let i = 0; i < this._pidList.length; i++ )
-					{
-						if ( this._pidList[ i ].mode === "03" )
-						{
-							reply.name  = this._pidList[ i ].name;
-							reply.value = this._pidList[ i ].convertToUseful(
-								valueArray[ 1 ],
-								valueArray[ 2 ],
-								valueArray[ 3 ],
-								valueArray[ 4 ],
-								valueArray[ 5 ],
-								valueArray[ 6 ]
-							);
-						}
-					}
-
-				}
-
-				return reply;
-			}
-
-		}
-
-	}
-
+    return reply;
+  }
 }

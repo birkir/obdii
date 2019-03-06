@@ -1,69 +1,45 @@
-/// <reference path="../typings/main.d.ts"/>
+import Debug from 'debug';
+import fs from 'fs';
+import path from 'path';
 
-import fs	= require("fs");
-import path	= require("path");
+const debug = Debug('OBD2.Core.DTC');
 
-let debug	: debug.IDebug = require("debug")("OBD2.Core.DTC");
+export class DTC {
+  private list: any = [];
 
-export namespace OBD2
-{
-	export namespace Core
-	{
-		export class DTC
-		{
-			private list	: any = [];
+  constructor() {
+    this.loadDtcList();
 
-			constructor()
-			{
-				this._loadDtcList();
+    debug('Ready');
+  }
 
-				debug("Ready");
-			}
+  public loadDtcList(basePath?: string) {
+    debug('Loading list');
 
-			public _loadDtcList( basePath? : string )
-			{
-				debug("Loading list");
+    basePath = basePath ? basePath : path.join(__dirname, '..', 'data', 'dtc');
 
-				basePath = basePath
-					? basePath
-					: path.join( __dirname, "..", "data", "dtc" )
-				;
+    try {
+      if (fs.statSync(basePath)) {
+        fs.readdirSync(basePath).forEach((file: string) => {
+          this.list.push(require(path.join(basePath, file)));
+        });
+      }
+    } catch (e) {
+      debug('[ERROR] Data directory not found!');
+    }
 
-				try
-				{
-					if ( fs.statSync( basePath ) )
-					{
-						fs.readdirSync( basePath ).forEach( ( file : string ) =>
-						{
-							this.list.push( require( path.join( basePath, file ) ) );
-						});
-					}
-				}
-				catch ( e )
-				{
-					debug("[ERROR] Data directory not found!");
-				}
+    debug('Loaded count: ' + this.list.length);
+  }
 
-				debug("Loaded count: " + this.list.length);
-			}
+  public getList() {
+    return this.list;
+  }
 
-			public getList()
-			{
-				return this.list;
-			}
+  public getByName(slug: string) {
+    //
+  }
 
-			public getByName( slug : string )
-			{
-				//
-			}
-
-			public getByPid( pid : string, mode? : string )
-			{
-				//
-			}
-
-		}
-
-	}
-
+  public getByPid(pid: string, mode?: string) {
+    //
+  }
 }

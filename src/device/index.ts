@@ -1,74 +1,55 @@
-/// <reference path="../typings/main.d.ts"/>
+import Debug from 'debug';
+import path from 'path';
 
-/// <reference path="../serial/index.ts"/>
+const debug = Debug('OBD2.Device.Main');
 
-let path  = require("path");
+export class Device {
+  private Device: any;
+  private name: string;
 
-let debug = require("debug")("OBD2.Device.Main");
+  constructor(deviceName?: string) {
+    if (deviceName) {
+      this.loadDevice(deviceName);
+    }
 
-export namespace OBD2
-{
-	export namespace Device
-	{
-		export class Main
-		{
-			private Device : any;
-			private _name  : string;
+    debug('Ready');
+  }
 
-			constructor( deviceName? : string )
-			{
-				if ( deviceName )
-				{
-					this.loadDevice( deviceName );
-				}
+  public connect(Serial: any, cb?: any) {
+    debug('Connecting');
 
-				debug("Ready");
-			}
+    this.Device.connect(Serial, () => {
+      debug('Connected');
 
-			public connect( Serial : any, cb ? : any )
-			{
-				debug("Connecting");
+      // Callback
+      cb();
+    });
+  }
 
-				this.Device.connect( Serial, () =>
-				{
-					debug("Connected");
+  public disconnect(Serial: any) {
+    //
+  }
 
-					// Callback
-					cb();
-				});
-			}
+  public loadDevice(deviceName: string) {
+    this.name = deviceName.toLowerCase();
+    this.Device = new (require(path.join(
+      __dirname,
+      this.name,
+      'index'
+    ))).OBD2.Device.ELM327();
 
-			public disconnect( Serial : any )
-			{
-				//
-			}
+    debug('Loaded device: ' + this.name);
+  }
 
-			public loadDevice( deviceName : string )
-			{
-				this._name  = deviceName.toLowerCase();
-				this.Device = new (require(
-					path.join( __dirname, this._name, "index" )
-				)).OBD2.Device.ELM327();
+  public getDevice(): any {
+    return this.Device;
+  }
 
-				debug("Loaded device: " + this._name);
-			}
+  public getDeviceName(): string {
+    return this.name;
+  }
 
-			public getDevice() : any
-			{
-				return this.Device;
-			}
-
-			public getDeviceName() : string
-			{
-				return this._name;
-			}
-
-			public setDevice( deviceObject : any ) : void
-			{
-				this.Device = deviceObject;
-			}
-		}
-
-	}
-
+  public setDevice(deviceObject: any): void {
+    this.Device = deviceObject;
+  }
 }

@@ -1,59 +1,66 @@
 {
-  "name": "obd2",
-  "version": "0.1.2",
+  "name": "obdii",
+  "version": "0.0.1",
   "description": "Vehicle communication and data parsing with OBD-II connector.",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
-    "start": "node example/server.js",
-    "typings": "cd src && typings install",
-    "lint": "tsconfig-lint && tslint -c tslint.json \"src/**/*.ts\"",
-    "docs": "typedoc --options typedoc.json ./src/",
-    "build": "node bin/build && tsc",
-    "test": "mocha --compilers --reporter spec test"
+    "prettier": "prettier --write '**/*.{json,md,js,jsx,ts,tsx}'",
+    "tslint": "tslint --fix 'src/**/*.{ts,tsx}' -p .",
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sipimokus/node-obd2.git"
+    "url": "git+https://github.com/birkir/obdii.git"
   },
   "keywords": [
     "obd",
     "obd2",
+    "obdii",
+    "react native",
     "elm327",
-    "bus",
     "can",
-    "iso",
-    "sae",
-    "pwm",
-    "kwp",
-    "vpw",
-    "pid",
-    "at",
     "serial",
     "bluetooth",
-    "usb",
-    "car",
-    "engine",
-    "vehicle",
-    "diagnostic",
-    "diagnostics"
+    "usb"
   ],
-  "author": "Bence Sipos <sipimokus@gmail.com>",
+  "authors": [
+    "Bence Sipos <sipimokus@gmail.com>",
+    "Birkir Gudjonsson <birkir.gudjonsson@gmail.com>"
+  ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/sipimokus/node-obd2/issues"
+    "url": "https://github.com/birkir/obdii"
   },
-  "homepage": "https://github.com/sipimokus/node-obd2",
+  "homepage": "https://github.com/birkir/obdii",
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,json,md}": [
+      "prettier --write",
+      "git add"
+    ]
+  },
+  "prettier": {
+    "singleQuote": true,
+    "trailingComma": "es5"
+  },
   "dependencies": {
-    "debug": "^2.2.0",
-    "serialport": "^2.0.6"
+    "debug": "2.6.9",
+    "serialport": "2.1.2"
   },
   "devDependencies": {
-    "assert": "^1.3.0",
-    "mocha": "^2.4.5",
-    "tsconfig-lint": "^0.5.0",
-    "tslint": "^3.3.0",
-    "typedoc": "^0.3.12",
-    "typescript": "^1.7.5",
-    "typings": "^0.6.6"
+    "@types/debug": "4.1.2",
+    "@types/node": "10.12.18",
+    "@types/serialport": "7.0.2",
+    "@ueno/tslint-config": "1.0.3",
+    "husky": "1.3.1",
+    "lint-staged": "8.1.5",
+    "prettier": "1.16.4",
+    "rimraf": "2.6.3",
+    "tslint": "5.12.1",
+    "typescript": "3.3.1"
   }
 }

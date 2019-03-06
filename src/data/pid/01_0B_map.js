@@ -1,21 +1,18 @@
-module.exports =
-{
-    mode:   "01",
-    pid:    "0B",
-    name:   "map",
-    description: "Intake Manifold Absolute Pressure",
+module.exports = {
+  mode: '01',
+  pid: '0B',
+  name: 'map',
+  description: 'Intake Manifold Absolute Pressure',
 
-    min:    0,
-    max:    255,
-    unit:   "kPa",
+  min: 0,
+  max: 255,
+  unit: 'kPa',
 
-    bytes:  1,
-    convertToUseful: function( byteA )
-    {
-        return parseInt( byteA, 16 );
-    },
-    testResponse: function( emulator )
-    {
-        return 40;
-    }
+  bytes: 1,
+  convertToUseful: function(byteA) {
+    return parseInt(byteA, 16);
+  },
+  testResponse: function(emulator) {
+    return 40;
+  },
 };

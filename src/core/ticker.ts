@@ -1,152 +1,104 @@
-/// <reference path="../typings/main.d.ts"/>
+import Debug from 'debug';
 
-let debug = require( "debug" )( "OBD2.Core.Ticker" );
+const debug = Debug('OBD2.Core.Ticker');
 
-export namespace OBD2
-{
-	export namespace Core
-	{
-		export class Ticker
-		{
-			private Ticker : any;
+export class Ticker {
+  private Ticker: any;
+  private commands: any = [];
+  private counter: number = 0;
+  private waiting: boolean = false;
+  private stopped: boolean = true;
 
-			private commands : any;
-			private timeout : number;
-			private counter : number;
-			private waiting : boolean;
-			private stopped : boolean;
+  constructor(private timeout: number) {
+    debug('Ready');
+  }
 
-			constructor( timeout : number )
-			{
-				this.timeout = timeout;
+  public writeNext(): void {
+    if (this.commands.length > 0) {
+      this.waiting = true;
 
-				this.commands = [];
-				this.counter  = 0;
-				this.stopped  = true;
-				this.waiting  = false;
+      const cmd = this.commands.shift();
 
-				debug( "Ready" );
-			}
+      debug('Tick ' + String(cmd.type) + ' : ' + String(cmd.data));
 
-			public writeNext() : void
-			{
-				if ( this.commands.length > 0 )
-				{
-					this.waiting = true;
+      cmd.call(() => {
+        this.waiting = false;
+      }, cmd);
 
-					let cmd = this.commands.shift();
+      if (cmd.loop) {
+        this.commands.push(cmd);
+      }
+    }
+  }
 
-					debug( "Tick " + String( cmd.type ) + " : " + String( cmd.data ) );
+  public addItem(type: string, data: any, loop?: boolean, callBack?: any) {
+    loop = loop ? loop : false;
 
-					cmd.call(
-						() => {
-							this.waiting = false;
-						},
-						cmd
-					);
+    this.commands.push({
+      type,
+      data,
+      loop,
+      call: callBack,
+      fail: 0,
+    });
 
-					if ( cmd.loop )
-					{
-						this.commands.push( cmd );
-					}
-				}
+    this.autoTimer();
+  }
 
-			}
+  public delItem(type: string, data: any) {
+    for (const index in this.commands) {
+      if (this.commands.hasOwnProperty(index)) {
+        const cmd = this.commands[index];
+        if (cmd.type === type && cmd.data === data) {
+          if (this.commands.length > 0) {
+            this.commands.splice(index, 1);
+          }
 
-			public addItem( type : string, data : any, loop? : boolean, callBack? : any )
-			{
-				loop = loop ? loop : false;
+          break; // Loop break
+        }
+      }
+    }
 
-				this.commands.push( {
-					type : type,
-					data : data,
-					loop : loop,
-					call : callBack,
-					fail : 0,
-				} );
+    this.autoTimer();
+  }
 
-				this._autoTimer();
-			}
+  public start() {
+    debug('Start', this.counter);
 
-			public delItem( type : string, data : any )
-			{
-				for ( let index in this.commands )
-				{
-					if ( this.commands.hasOwnProperty( index ) )
-					{
-						let cmd = this.commands[ index ];
-						if ( cmd.type === type && cmd.data === data )
-						{
-							if ( this.commands.length > 0 )
-							{
-								this.commands.splice( index, 1 );
-							}
+    this.counter = 0;
+    this.stopped = false;
+    this.Ticker = setInterval(() => {
+      this.counter++;
+      if (!this.waiting) {
+        this.writeNext();
+      }
+    }, this.timeout);
+  }
 
-							break;	// Loop break
-						}
-					}
-				}
+  public stop() {
+    debug('Stop');
 
-				this._autoTimer();
-			}
+    clearInterval(this.Ticker);
 
-			public start()
-			{
-				debug( "Start" );
+    this.commands = [];
+    this.counter = 0;
+    this.stopped = true;
+    this.waiting = false;
+  }
 
-				this.counter = 0;
-				this.stopped = false;
-				this.Ticker  = setInterval(
-					() =>
-					{
-						this.counter++;
-						if ( !this.waiting /*|| this.counter >= parseInt(10000 / this.timeout)*/ )
-						{
-							this.writeNext();
-						}
+  public pause() {
+    debug('Pause');
 
-					},
-					this.timeout
-				);
-			}
+    clearInterval(this.Ticker);
+  }
 
-			public stop()
-			{
-				debug( "Stop" );
-
-				clearInterval( this.Ticker );
-
-				this.commands = [];
-				this.counter  = 0;
-				this.stopped  = true;
-				this.waiting  = false;
-			}
-
-			public pause()
-			{
-				debug( "Pause" );
-
-				clearInterval( this.Ticker );
-			}
-
-			private _autoTimer()
-			{
-				if ( this.commands.length > 0 )
-				{
-					if ( this.stopped )
-					{
-						this.start();
-					}
-				}
-				else
-				{
-					this.stop();
-				}
-
-			}
-
-		}
-
-	}
-
+  private autoTimer() {
+    if (this.commands.length > 0) {
+      if (this.stopped) {
+        this.start();
+      }
+    } else {
+      this.stop();
+    }
+  }
 }
