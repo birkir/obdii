@@ -48,7 +48,9 @@
     "trailingComma": "es5"
   },
   "dependencies": {
+    "cryptiles": "^4.1.2",
     "debug": "2.6.9",
+    "hoek": "^4.2.1",
     "serialport": "2.1.2"
   },
   "devDependencies": {
