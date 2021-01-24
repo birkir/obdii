@@ -51,7 +51,7 @@
     "cryptiles": "^4.1.2",
     "debug": "2.6.9",
     "hoek": "^4.2.1",
-    "serialport": "2.1.2"
+    "serialport": "^9.0.6"
   },
   "devDependencies": {
     "@types/debug": "4.1.2",
